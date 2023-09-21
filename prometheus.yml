@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'client_service'
+    static_configs:
+      - targets: ['client:9090']

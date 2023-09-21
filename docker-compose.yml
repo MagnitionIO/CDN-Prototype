@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  client:
+    build:
+      context: .
+      dockerfile: cmd/client/Dockerfile
+    entrypoint: ["/bin/sh", "/wait-for-varnish.sh", "--", "cdn_client"]
+    command:
+      - "--server-addr=:9090" # server address for prometheus
+      # - "--origin-addr=origin:8080" # server address for origin
+      - "--origin-addrs=frontend1:80,frontend2:80" # server address for varnish
+      - "--wiki-file=/data/wiki_1k.csv"
+      - "--log-level=debug"
+      - "--cpus=1"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./cmd/client/wiki.csv:/data/wiki.csv
+      - ./cmd/client/wiki_1k.csv:/data/wiki_1k.csv
+      - ./internal/client/wait-for-varnish.sh:/wait-for-varnish.sh
+    depends_on:
+      - origin
+      - frontend1
+      - frontend2
+    networks:
+      - mynetwork
+
+  origin:
+    build:
+      context: .
+      dockerfile: cmd/origin/Dockerfile
+    entrypoint: ["cdn_origin"]
+    command:
+      - "--server-port=8080"
+      - "--log-level=debug"
+      - "--cpus=1"
+    networks:
+      - mynetwork
+  
+  frontend1:
+    image: varnish:latest
+    volumes:
+      - ./scene/cache-node/frontend/default.vcl:/etc/varnish/default.vcl
+      - ./scene/cache-node/frontend/start.sh:/start.sh
+    # command: sh -c "/start.sh"
+    command: >
+      -s malloc,10m
+    ports:
+      - "10080:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  frontend2:
+    image: varnish:latest
+    volumes:
+      - ./scene/cache-node/frontend/default.vcl:/etc/varnish/default.vcl
+      - ./scene/cache-node/frontend/start.sh:/start.sh
+    # command: sh -c "/start.sh"
+    command: >
+      -s malloc,10m
+    ports:
+      - "10081:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9091:9090"
+    networks:
+      - mynetwork
+  
+  # backend:
+  #   image: ubuntu:23.10
+
+
+networks:
+  mynetwork:
+    driver: bridge
