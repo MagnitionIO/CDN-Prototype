@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: cmd/client/Dockerfile
-    entrypoint: ["/bin/sh", "/wait-for-varnish.sh", "--", "cdn_client"]
+    entrypoint: ["/bin/sh", "/wait-for-edges.sh", "--", "cdn_client"]
     command:
       - "--server-addr=:9090" # server address for prometheus
       # - "--origin-addr=origin:8080" # server address for origin
@@ -19,10 +19,13 @@ services:
       - ./cmd/client/wiki.csv:/data/wiki.csv
       - ./cmd/client/wiki_1k.csv:/data/wiki_1k.csv
       - ./internal/client/wait-for-varnish.sh:/wait-for-varnish.sh
+      - ./internal/client/wait-for-edges.sh:/wait-for-edges.sh
+      - ./logs:/var/log
     depends_on:
       - origin
       - frontend1
       - frontend2
+      - edge-backend
     networks:
       - mynetwork
 
@@ -41,11 +44,10 @@ services:
   frontend1:
     image: varnish:latest
     volumes:
-      - ./scene/cache-node/frontend/default.vcl:/etc/varnish/default.vcl
-      - ./scene/cache-node/frontend/start.sh:/start.sh
-    # command: sh -c "/start.sh"
+      - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
+      - varnish_storage1:/var/lib/varnish:rw
     command: >
-      -s malloc,10m
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,10m
     ports:
       - "10080:80"
     depends_on:
@@ -56,11 +58,10 @@ services:
   frontend2:
     image: varnish:latest
     volumes:
-      - ./scene/cache-node/frontend/default.vcl:/etc/varnish/default.vcl
-      - ./scene/cache-node/frontend/start.sh:/start.sh
-    # command: sh -c "/start.sh"
+      - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
+      - varnish_storage2:/var/lib/varnish:rw
     command: >
-      -s malloc,10m
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage2.bin,10m
     ports:
       - "10081:80"
     depends_on:
@@ -68,6 +69,20 @@ services:
     networks:
       - mynetwork
   
+  edge-backend:
+    build:
+      context: .
+      dockerfile: scene/trafficserver/Dockerfile
+    volumes:
+      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records_test.config
+      - ./scene/cache-node/backend/remap.config:/etc/trafficserver/remap.config
+    ports:
+      - "20080:8080"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+
 
   prometheus:
     image: prom/prometheus
@@ -77,9 +92,10 @@ services:
       - "9091:9090"
     networks:
       - mynetwork
-  
-  # backend:
-  #   image: ubuntu:23.10
+
+volumes:
+  varnish_storage1:
+  varnish_storage2:
 
 
 networks:

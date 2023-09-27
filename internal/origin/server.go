@@ -64,5 +64,8 @@ func (s *Server) getObject(ctx echo.Context) error {
 
 	log.Debug().Str("objId", objId).Int("objSize", objSize).Msg("Try to get object")
 
+	// Set Cache-Control header
+	ctx.Response().Header().Set("Cache-Control", "public, max-age=3600")
+
 	return ctx.String(http.StatusOK, strings.Repeat("*", objSize))
 }

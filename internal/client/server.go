@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 )
 
 type Server struct {
@@ -45,7 +46,7 @@ func (s *Server) Serve() error {
 	prometheus.MustRegister(s.metrics.requests)
 	prometheus.MustRegister(s.metrics.latency)
 
-	logFile, err := os.OpenFile("/var/log/cdn_client.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile("/var/log/cdn_client.log", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err // or however you want to handle this error
 	}
@@ -61,7 +62,6 @@ func (s *Server) Serve() error {
 	log := zerolog.New(logFile).With().Timestamp().Logger()
 	s.Logger = &log
 
-	// s.ec.Use(middleware.Logger())
 	s.setHandlers()
 
 	s.client = &origin.Client{
@@ -96,6 +96,9 @@ func (s *Server) loadWikiTrace() {
 
 	ctx := context.TODO()
 	log := s.Logger.With().Str("wiki", s.WikiFile).Logger()
+
+	// Initialize rate limiter
+	limiter := rate.NewLimiter(rate.Every(time.Millisecond), 1) // 1 requests per second
 
 	if len(s.WikiFile) == 0 {
 		log.Info().Msg("Skip loading wiki trace: empty file name")
@@ -136,6 +139,9 @@ func (s *Server) loadWikiTrace() {
 			log.Warn().Err(err).Strs("record", record).Msg("Skip invalid record")
 			continue
 		}
+
+		// Wait for rate limiter
+		limiter.Wait(ctx)
 
 		wg.Add(1)
 		ants.Submit(func() {
