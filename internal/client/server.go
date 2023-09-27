@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
 	"github.com/panjf2000/ants/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,13 +45,23 @@ func (s *Server) Serve() error {
 	prometheus.MustRegister(s.metrics.requests)
 	prometheus.MustRegister(s.metrics.latency)
 
+	logFile, err := os.OpenFile("/var/log/cdn_client.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return err // or however you want to handle this error
+	}
+	defer logFile.Close()
+
 	s.ec = echo.New()
 	if s.Logger == nil {
 		log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
 			With().Timestamp().Logger()
 		s.Logger = &log
 	}
-	s.ec.Use(middleware.Logger())
+
+	log := zerolog.New(logFile).With().Timestamp().Logger()
+	s.Logger = &log
+
+	// s.ec.Use(middleware.Logger())
 	s.setHandlers()
 
 	s.client = &origin.Client{
