@@ -10,15 +10,13 @@ services:
       - "--server-addr=:9090" # server address for prometheus
       # - "--origin-addr=origin:8080" # server address for origin
       - "--origin-addrs=frontend1:80,frontend2:80" # server address for varnish
-      - "--wiki-file=/data/wiki_1k.csv"
+      - "--wiki-file=/data/wiki_test.csv"
       - "--log-level=debug"
       - "--cpus=1"
     ports:
       - "9090:9090"
     volumes:
-      - ./cmd/client/wiki.csv:/data/wiki.csv
-      - ./cmd/client/wiki_1k.csv:/data/wiki_1k.csv
-      - ./internal/client/wait-for-varnish.sh:/wait-for-varnish.sh
+      - ./cmd/client/wiki_test.csv:/data/wiki_test.csv
       - ./internal/client/wait-for-edges.sh:/wait-for-edges.sh
       - ./logs:/var/log
     depends_on:
@@ -38,6 +36,8 @@ services:
       - "--server-port=8080"
       - "--log-level=debug"
       - "--cpus=1"
+    volumes:
+      - ./logs:/var/log
     networks:
       - mynetwork
   
@@ -74,8 +74,12 @@ services:
       context: .
       dockerfile: scene/trafficserver/Dockerfile
     volumes:
-      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records_test.config
+      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
       - ./scene/cache-node/backend/remap.config:/etc/trafficserver/remap.config
+      - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
+      - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
+      - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
+      - ./logs:/var/log/trafficserver
     ports:
       - "20080:8080"
     depends_on:

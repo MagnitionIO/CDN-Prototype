@@ -6,6 +6,8 @@ RUN apt-get update \
     && mkdir /run/trafficserver \
     && chmod 777 /run/trafficserver
 
+RUN mkdir -p /var/cache
+
 USER trafficserver
 WORKDIR /home/trafficserver
 

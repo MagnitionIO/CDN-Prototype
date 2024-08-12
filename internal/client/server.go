@@ -98,7 +98,7 @@ func (s *Server) loadWikiTrace() {
 	log := s.Logger.With().Str("wiki", s.WikiFile).Logger()
 
 	// Initialize rate limiter
-	limiter := rate.NewLimiter(rate.Every(time.Second), 1) // 1 requests per second
+	limiter := rate.NewLimiter(rate.Every(time.Second*5), 1) // 1 requests per second
 
 	if len(s.WikiFile) == 0 {
 		log.Info().Msg("Skip loading wiki trace: empty file name")
@@ -200,15 +200,16 @@ func (s *Server) getObject(ctx context.Context, seq, id, size int) {
 
 	latency := time.Since(start) // Calculate the total latency here
 
-	xcache := resp.Header.Get("X-Cache")
+	xcache_status := resp.Header.Get("X-Cache-Status")
+	xcache_node := resp.Header.Get("X-Cache-Node")
 
-	if len(xcache) == 0 {
-		xcache = "none"
+	if len(xcache_status) == 0 {
+		xcache_status = "none"
 	}
-	s.metrics.requests.WithLabelValues(xcache).Inc()
+	s.metrics.requests.WithLabelValues(xcache_status).Inc()
 	s.metrics.latency.Observe(float64(latency.Milliseconds()))
 
-	log.Debug().Str("status", xcache).Dur("latency", latency).Msg("Get object")
+	log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Dur("latency", latency).Msg("Get object")
 }
 
 var originIndex = 0

@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
@@ -27,11 +26,15 @@ func (s *Server) Serve() error {
 	}
 
 	s.ec = echo.New()
-	if s.Logger == nil {
-		log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
-			With().Timestamp().Logger()
-		s.Logger = &log
+
+	logFile, err := os.OpenFile("/var/log/origin.log", os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return err // or however you want to handle this error
 	}
+	defer logFile.Close()
+
+	log := zerolog.New(logFile).With().Timestamp().Logger()
+	s.Logger = &log
 	s.setHandlers()
 
 	s.Logger.Info().
@@ -65,7 +68,9 @@ func (s *Server) getObject(ctx echo.Context) error {
 	log.Debug().Str("objId", objId).Int("objSize", objSize).Msg("Try to get object")
 
 	// Set Cache-Control header
-	ctx.Response().Header().Set("Cache-Control", "public, max-age=3600")
+	ctx.Response().Header().Set("Cache-Control", "public, max-age=172800")
+	ctx.Response().Header().Set("X-Cache-Status", "MISS")
+	ctx.Response().Header().Set("X-Cache-Node", "ORIGIN")
 
 	return ctx.String(http.StatusOK, strings.Repeat("*", objSize))
 }
