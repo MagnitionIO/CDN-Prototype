@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: cmd/client/Dockerfile
     entrypoint: ["/bin/sh", "/wait-for-edges.sh", "--", "cdn_client"]
+    container_name: CLIENT
     command:
       - "--server-addr=:9090" # server address for prometheus
       # - "--origin-addr=origin:8080" # server address for origin
@@ -32,6 +33,7 @@ services:
       context: .
       dockerfile: cmd/origin/Dockerfile
     entrypoint: ["cdn_origin"]
+    container_name: ORIGIN
     command:
       - "--server-port=8080"
       - "--log-level=debug"
@@ -43,9 +45,11 @@ services:
   
   frontend1:
     image: varnish:latest
+    container_name: L1_1
     volumes:
       - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
       - varnish_storage1:/var/lib/varnish:rw
+      - ./logs:/var/log/varnish
     command: >
       -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,10m
     ports:
@@ -54,9 +58,21 @@ services:
       - origin
     networks:
       - mynetwork
+
+  # frontend1_log:
+  #   image: varnish:latest
+  #   container_name: L1_1_LOG
+  #   depends_on:
+  #     - frontend1
+  #   volumes:
+  #     - ./logs:/var/log/varnish
+  #   command: varnishlog
+  #   networks:
+  #     - mynetwork
   
   frontend2:
     image: varnish:latest
+    container_name: L1_2
     volumes:
       - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
       - varnish_storage2:/var/lib/varnish:rw
@@ -73,6 +89,7 @@ services:
     build:
       context: .
       dockerfile: scene/trafficserver/Dockerfile
+    container_name: L2_1
     volumes:
       - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
       - ./scene/cache-node/backend/remap.config:/etc/trafficserver/remap.config
@@ -87,9 +104,9 @@ services:
     networks:
       - mynetwork
 
-
   prometheus:
     image: prom/prometheus
+    container_name: STATS
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:

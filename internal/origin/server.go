@@ -56,6 +56,9 @@ func (s *Server) sayHello(ctx echo.Context) error {
 func (s *Server) getObject(ctx echo.Context) error {
 	log := s.Logger.With().Str("path", ctx.Path()).Logger()
 
+	l1_store_header := ctx.Request().Header.Get("X-Cache-L1-Store")
+	l2_store_header := ctx.Request().Header.Get("X-Cache-L2-Store")
+
 	objSize := 0
 	objId := ctx.Param("id")
 	if size, err := strconv.Atoi(ctx.QueryParam("size")); err != nil {
@@ -65,12 +68,14 @@ func (s *Server) getObject(ctx echo.Context) error {
 		objSize = size
 	}
 
-	log.Debug().Str("objId", objId).Int("objSize", objSize).Msg("Try to get object")
+	log.Debug().Str("objId", objId).Int("objSize", objSize).Str("X-Cache-L1-Store", l1_store_header).Str("X-Cache-L2-Store", l2_store_header).Msg("Try to get object")
 
 	// Set Cache-Control header
 	ctx.Response().Header().Set("Cache-Control", "public, max-age=172800")
 	ctx.Response().Header().Set("X-Cache-Status", "MISS")
 	ctx.Response().Header().Set("X-Cache-Node", "ORIGIN")
+	ctx.Response().Header().Set("X-Cache-L1-Store", l1_store_header)
+	ctx.Response().Header().Set("X-Cache-L2-Store", l2_store_header)
 
 	return ctx.String(http.StatusOK, strings.Repeat("*", objSize))
 }

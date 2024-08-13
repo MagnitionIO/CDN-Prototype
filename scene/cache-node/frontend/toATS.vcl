@@ -15,7 +15,11 @@ sub vcl_backend_fetch {
 }
 
 sub vcl_backend_response {
-    set beresp.ttl = 60s;
+    if (beresp.http.X-Cache-L1-Store == "True") {
+        set beresp.ttl = 60s;
+    } else {
+        set beresp.ttl = 0s;
+    }
 }
 
 sub vcl_deliver {

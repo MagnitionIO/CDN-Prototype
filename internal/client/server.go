@@ -189,7 +189,12 @@ func (s *Server) getObject(ctx context.Context, seq, id, size int) {
 		Str("endpoint", endpoint).
 		Logger()
 
-	resp, err := s.client.GetObject(ctx, id, size, endpoint)
+	headers := map[string]string{
+		"X-Cache-L1-Store": "False",
+		"X-Cache-L2-Store": "False",
+	}
+
+	resp, err := s.client.GetObject(ctx, id, size, endpoint, headers)
 	// log.Debug().Str("resp", fmt.Sprintf("%+v", resp.StringResponse.Response)).Msg("Get object")
 
 	if err != nil {
