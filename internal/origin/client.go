@@ -24,12 +24,12 @@ func (c *Client) SayHello(ctx context.Context, endpoint string) (*StringResponse
 	return &StringResponse{Response: resp}, nil
 }
 
-func (c *Client) GetObject(ctx context.Context, id int, size int, endpoint string, headers map[string]string) (*ObjectResponse, error) {
+func (c *Client) GetObject(ctx context.Context, id string, size int, endpoint string, headers map[string]string) (*ObjectResponse, error) {
 	if c.Client == nil {
 		return nil, ErrNilHttpClient
 	}
 
-	url := fmt.Sprintf("%s/origin/objects/%d?size=%d", endpoint, id, size)
+	url := fmt.Sprintf("%s/origin/objects/%s?size=%d", endpoint, id, size)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

@@ -10,6 +10,8 @@ require (
 	github.com/rs/zerolog v1.30.0
 )
 
+require github.com/spaolacci/murmur3 v1.1.0 // indirect
+
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

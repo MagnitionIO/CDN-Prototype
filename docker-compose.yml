@@ -9,9 +9,10 @@ services:
     container_name: CLIENT
     command:
       - "--server-addr=:9090" # server address for prometheus
-      # - "--origin-addr=origin:8080" # server address for origin
-      - "--origin-addrs=frontend1:80,frontend2:80" # server address for varnish
-      - "--wiki-file=/data/wiki_test.csv"
+      - "--l1-addrs=frontend1:80,frontend2:80" # server address for varnish
+      - "--l2-addrs=frontend1:80,frontend2:80" # server address for varnish
+      - "--l1-lb=rand"
+      - "--trace-file=/data/wiki_test.csv"
       - "--log-level=debug"
       - "--cpus=1"
     ports:
@@ -96,9 +97,28 @@ services:
       - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
       - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
       - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
-      - ./logs:/var/log/trafficserver
+      - ./logs/be_1:/var/log/trafficserver
     ports:
       - "20080:8080"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  edge-backend-2:
+    build:
+      context: .
+      dockerfile: scene/trafficserver/Dockerfile
+    container_name: L2_2
+    volumes:
+      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
+      - ./scene/cache-node/backend/remap_2.config:/etc/trafficserver/remap.config
+      - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
+      - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
+      - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
+      - ./logs/be_2:/var/log/trafficserver
+    ports:
+      - "20081:8080"
     depends_on:
       - origin
     networks:

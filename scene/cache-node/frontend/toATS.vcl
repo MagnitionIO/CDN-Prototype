@@ -5,13 +5,21 @@ backend edge-backend {
     .port = "8080";
 }
 
+backend edge-backend-2 {
+    .host = "edge-backend-2";
+    .port = "8080";
+}
+
 sub vcl_recv {
-    # Set the backend to the origin server
-    set req.backend_hint = edge-backend;
+    if (req.http.X-Cache-L2-Server == "0") {
+        set req.backend_hint = edge-backend;
+    } else {
+        set req.backend_hint = edge-backend-2;
+    }
 }
 
 sub vcl_backend_fetch {
-    set bereq.http.Host = "edge-backend:8080";
+#    set bereq.http.Host = "edge-backend:8080";
 }
 
 sub vcl_backend_response {

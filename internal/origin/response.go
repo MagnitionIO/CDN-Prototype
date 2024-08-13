@@ -30,6 +30,6 @@ func (r *StringResponse) Result() (string, error) {
 
 type ObjectResponse struct {
 	StringResponse
-	ID   int
+	ID   string
 	Size int
 }

@@ -14,11 +14,13 @@ import (
 
 func main() {
 	var opts struct {
-		ServerAddr  string `long:"server-addr" description:"specifying a server address for prometheus" default:":9090"`
-		OriginAddrs string `long:"origin-addrs" description:"specifying origin addresses to get object" default:":8080"`
-		WikiFile    string `long:"wiki-file" description:"specifying a file name of wiki trace records"`
-		LogLevel    string `long:"log-level" description:"specifying log level (info, debug, warn, error)" default:"info"`
-		CPUs        int    `long:"cpus" description:"specify the number of CPUs to be used" default:"1"`
+		ServerAddr string `long:"server-addr" description:"specifying a server address for prometheus" default:":9090"`
+		L1Addrs    string `long:"l1-addrs" description:"specifying L1 addresses to get object" default:":8080"`
+		L2Addrs    string `long:"l2-addrs" description:"specifying L2 addresses to get object" default:":8080"`
+		L1LB       string `long:"l1-lb" description:"specifying L1 LB type, rand or hash"`
+		TraceFile  string `long:"trace-file" description:"specifying a file name of wiki trace records"`
+		LogLevel   string `long:"log-level" description:"specifying log level (info, debug, warn, error)" default:"info"`
+		CPUs       int    `long:"cpus" description:"specify the number of CPUs to be used" default:"1"`
 	}
 
 	_, err := flags.Parse(&opts)
@@ -49,14 +51,20 @@ func main() {
 		logger = logger.Level(zerolog.InfoLevel)
 	}
 
-	originAddrs := strings.Split(opts.OriginAddrs, ",")
+	L1Addrs := strings.Split(opts.L1Addrs, ",")
+	L2Addrs := strings.Split(opts.L2Addrs, ",")
+	var L1LB = client.StringToLB[opts.L1LB]
+	var L2LB = client.StringToLB["hash"]
 
 	s := &client.Server{
-		Addr:        opts.ServerAddr,
-		OriginAddrs: originAddrs,
-		WikiFile:    opts.WikiFile,
-		CPUs:        opts.CPUs,
-		Logger:      &logger,
+		Addr:     opts.ServerAddr,
+		L1Addrs:  L1Addrs,
+		L2Addrs:  L2Addrs,
+		L1LB:     L1LB,
+		L2LB:     L2LB,
+		WikiFile: opts.TraceFile,
+		CPUs:     opts.CPUs,
+		Logger:   &logger,
 	}
 
 	if err := s.Serve(); err != nil {

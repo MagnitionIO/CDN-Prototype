@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,15 +18,37 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
+	"github.com/spaolacci/murmur3"
 	"golang.org/x/time/rate"
 )
 
+type LB_TYPE int
+
+const (
+	Unknown LB_TYPE = iota
+	Hash
+	Rand
+)
+
+var LBStrings = map[LB_TYPE]string{
+	Hash: "hash",
+	Rand: "rand",
+}
+
+var StringToLB = map[string]LB_TYPE{
+	"hash": Hash,
+	"rand": Rand,
+}
+
 type Server struct {
-	Addr        string // for prometheus
-	OriginAddrs []string
-	Logger      *zerolog.Logger
-	WikiFile    string
-	CPUs        int // 0 => serial execution; positive => multiple goroutinues
+	Addr     string // for prometheus
+	L1Addrs  []string
+	L2Addrs  []string
+	L1LB     LB_TYPE
+	L2LB     LB_TYPE
+	Logger   *zerolog.Logger
+	WikiFile string
+	CPUs     int // 0 => serial execution; positive => multiple goroutinues
 
 	client      *origin.Client
 	metrics     *metrics
@@ -61,6 +84,12 @@ func (s *Server) Serve() error {
 
 	log := zerolog.New(logFile).With().Timestamp().Logger()
 	s.Logger = &log
+
+	s.Logger.Info().
+		Str("Stats-Addr:", s.Addr).
+		Str("L1-LB:", LBStrings[s.L1LB]).
+		Str("L2-LB:", LBStrings[s.L2LB]).
+		Msg("Client Parameters")
 
 	s.setHandlers()
 
@@ -159,13 +188,13 @@ func (s *Server) loadWikiTrace() {
 		Msg("Get all objects")
 }
 
-func (s *Server) parse(record []string) (seq, id, size int, err error) {
+func (s *Server) parse(record []string) (seq int, id string, size int, err error) {
 	seq, err = strconv.Atoi(record[0])
 	if err != nil {
 		return
 	}
 
-	id, err = strconv.Atoi(record[1])
+	id = record[1]
 	if err != nil {
 		return
 	}
@@ -178,20 +207,36 @@ func (s *Server) parse(record []string) (seq, id, size int, err error) {
 	return
 }
 
-func (s *Server) getObject(ctx context.Context, seq, id, size int) {
+func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	start := time.Now() // Record the start time here
 
-	endpoint := "http://" + s.getOriginAddr()
+	var nextIndex = 0
+	var hash32 = murmur3.Sum32([]byte(id))
+	nextL2Index := int(hash32 % uint32(len(s.L2Addrs)))
+	switch s.L1LB {
+	case Rand:
+		nextIndex = rand.Int() % len(s.L1Addrs)
+	case Hash:
+		nextIndex = int(hash32 % uint32(len(s.L1Addrs)))
+	default:
+	}
+	//	originMutex.Lock()
+	addr := s.L1Addrs[nextIndex]
+
+	endpoint := "http://" + addr
 
 	log := s.Logger.With().Int("seq", seq).
-		Int("id", id).
+		Str("id", id).
 		Int("size", size).
+		Int("L1:", nextIndex).
+		Int("L2:", nextL2Index).
 		Str("endpoint", endpoint).
 		Logger()
 
 	headers := map[string]string{
-		"X-Cache-L1-Store": "False",
-		"X-Cache-L2-Store": "False",
+		"X-Cache-L1-Store":  "False",
+		"X-Cache-L2-Store":  "False",
+		"X-Cache-L2-Server": strconv.FormatUint(uint64(nextL2Index), 10),
 	}
 
 	resp, err := s.client.GetObject(ctx, id, size, endpoint, headers)
@@ -217,14 +262,23 @@ func (s *Server) getObject(ctx context.Context, seq, id, size int) {
 	log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Dur("latency", latency).Msg("Get object")
 }
 
-var originIndex = 0
-var originMutex = sync.Mutex{}
+// var originIndex = 0
+// var originMutex = sync.Mutex{}
 
-func (s *Server) getOriginAddr() string {
-	// Load balancing: round-robin
-	originMutex.Lock()
-	addr := s.OriginAddrs[originIndex%len(s.OriginAddrs)]
-	originIndex++
-	originMutex.Unlock()
-	return addr
-}
+// func (s *Server) getOriginAddr(id string) string {
+// 	// Load balancing: round-robin
+// 	var nextIndex = 0
+// 	switch s.L1LB {
+// 	case Rand:
+// 		nextIndex = rand.Int() % len(s.L1Addrs)
+// 	case Hash:
+// 		hash32 := murmur3.Sum32([]byte(id))
+// 		nextIndex = hash32 % len(s.L1Addrs)
+// 	default:
+// 	}
+// 	//	originMutex.Lock()
+// 	addr := s.L1Addrs[nextIndex]
+// 	//	originIndex++
+// 	//	originMutex.Unlock()
+// 	return addr
+// }
