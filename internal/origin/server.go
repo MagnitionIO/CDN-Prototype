@@ -7,15 +7,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
 )
 
 type Server struct {
-	Addr   string
-	Port   uint16
-	Logger *zerolog.Logger
+	Addr     string
+	Port     uint16
+	Logger   *zerolog.Logger
+	LogLevel zerolog.Level
 
 	ec *echo.Echo
 }
@@ -23,6 +25,10 @@ type Server struct {
 func (s *Server) Serve() error {
 	if s.Port == 0 {
 		return errors.New("missing port value")
+	}
+
+	zerolog.TimestampFunc = func() time.Time {
+		return time.Now().In(time.Local)
 	}
 
 	s.ec = echo.New()
@@ -33,7 +39,10 @@ func (s *Server) Serve() error {
 	}
 	defer logFile.Close()
 
-	log := zerolog.New(logFile).With().Timestamp().Logger()
+	log := zerolog.New(logFile).
+		Level(s.LogLevel).
+		With().Timestamp().Logger()
+
 	s.Logger = &log
 	s.setHandlers()
 

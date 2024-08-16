@@ -1,0 +1,21 @@
+prototype:
+  working_set_size: 64424509440
+  max_cachable_obj_size: 10485760
+  ratio_of_working_set: 0.05
+  cache_size_ratio: 0.2
+  l1_server_lb: RAND
+  l1_servers:
+    nodes: 2
+    cache_type: VARNISH
+    storage_media: RAM
+    store_on_miss: False
+    store_from_origin: True
+    eviction_types: LRU
+  l2_server_lb: HASH
+  l2_servers:
+    nodes: 2
+    cache_type: VARNISH
+    storage_media: SSD
+    store_on_miss: False
+    store_from_origin: True
+    eviction_types: LRU

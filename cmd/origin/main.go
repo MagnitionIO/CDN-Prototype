@@ -11,6 +11,25 @@ import (
 	"github.com/rs/zerolog"
 )
 
+func getLogLevel(level string) zerolog.Level {
+	switch level {
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	case "fatal":
+		return zerolog.FatalLevel
+	case "panic":
+		return zerolog.PanicLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
 func main() {
 	var opts struct {
 		ServerAddr string `long:"server-addr" description:"specifying a server address"`
@@ -33,24 +52,18 @@ func main() {
 		runtime.GOMAXPROCS(opts.CPUs)
 	}
 
+	logLevel := getLogLevel(opts.LogLevel)
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
-		With().Timestamp().Logger()
-
-	switch opts.LogLevel {
-	case "debug":
-		logger = logger.Level(zerolog.DebugLevel)
-	case "error":
-		logger = logger.Level(zerolog.ErrorLevel)
-	case "warn":
-		logger = logger.Level(zerolog.WarnLevel)
-	default:
-		logger = logger.Level(zerolog.InfoLevel)
-	}
+		Level(logLevel).
+		With().
+		Timestamp().
+		Logger()
 
 	s := origin.Server{
-		Addr:   opts.ServerAddr,
-		Port:   opts.ServerPort,
-		Logger: &logger,
+		Addr:     opts.ServerAddr,
+		Port:     opts.ServerPort,
+		Logger:   &logger,
+		LogLevel: logLevel,
 	}
 
 	if err := s.Serve(); err != nil {

@@ -1,7 +1,7 @@
 FROM ubuntu:23.10
 
 RUN apt-get update \
-    && apt-get install -y trafficserver \
+    && apt-get install -y curl trafficserver \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir /run/trafficserver \
     && chmod 777 /run/trafficserver

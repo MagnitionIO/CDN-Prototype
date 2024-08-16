@@ -1,49 +1,89 @@
 #!/bin/sh
 
-# Host and port where Varnish caches are running
-VARNISH_HOST1="frontend1"
-VARNISH_PORT1="80"
+# L1 CACHES
+L1_1_HOST="frontend1"
+L1_1_PORT="80"
 
-VARNISH_HOST2="frontend2"
-VARNISH_PORT2="80"
+L1_2_HOST="frontend2"
+L1_2_PORT="80"
 
-ATS_HOST1="edge-backend"
-ATS_PORT1="8080"
+L1_3_HOST="frontend3"
+L1_3_PORT="80"
 
-ATS_HOST2="edge-backend-2"
-ATS_PORT2="8080"
+L1_4_HOST="frontend4"
+L1_4_PORT="80"
 
-# Loop until Varnish1 is reachable
-until nc -z $VARNISH_HOST1 $VARNISH_PORT1; do
-  echo "$(date) - waiting for Varnish service at $VARNISH_HOST1:$VARNISH_PORT1..."
+# L2 CACHES
+L2_1_HOST="edge-backend-1"
+L2_1_PORT="80"
+
+L2_2_HOST="edge-backend-2"
+L2_2_PORT="80"
+
+L2_3_HOST="edge-backend-3"
+L2_3_PORT="80"
+
+L2_4_HOST="edge-backend-4"
+L2_4_PORT="80"
+
+# L1 CACHES
+until nc -z $L1_1_HOST $L1_1_PORT; do
+  echo "$(date) - waiting for service at $L1_1_HOST:$L1_1_PORT..."
   sleep 2
 done
 
-echo "$(date) - Varnish service is ready at $VARNISH_HOST1:$VARNISH_PORT1"
+echo "$(date) - service is ready at $L1_1_HOST:$L1_1_PORT"
 
-# Loop until Varnish2 is reachable
-until nc -z $VARNISH_HOST2 $VARNISH_PORT2; do
-  echo "$(date) - waiting for Varnish service at $VARNISH_HOST2:$VARNISH_PORT2..."
+until nc -z $L1_2_HOST $L1_2_PORT; do
+  echo "$(date) - waiting for service at $L1_2_HOST:$L1_2_PORT..."
   sleep 2
 done
 
-echo "$(date) - Varnish service is ready at $VARNISH_HOST2:$VARNISH_PORT2"
+echo "$(date) - service is ready at $L1_2_HOST:$L1_2_PORT"
 
-# Loop until ATS is reachable
-until nc -z $ATS_HOST1 $ATS_PORT1; do
-  echo "$(date) - waiting for ATS service at $ATS_HOST1:$ATS_PORT1..."
+until nc -z $L1_3_HOST $L1_3_PORT; do
+  echo "$(date) - waiting for service at $L1_3_HOST:$L1_3_PORT..."
   sleep 2
 done
 
-echo "$(date) - ATS service is ready at $ATS_HOST1:$ATS_PORT1"
+echo "$(date) - service is ready at $L1_3_HOST:$L1_3_PORT"
 
-# Loop until ATS is reachable
-until nc -z $ATS_HOST2 $ATS_PORT2; do
-  echo "$(date) - waiting for ATS service at $ATS_HOST2:$ATS_PORT2..."
+until nc -z $L1_4_HOST $L1_4_PORT; do
+  echo "$(date) - waiting for service at $L1_4_HOST:$L1_4_PORT..."
   sleep 2
 done
 
-echo "$(date) - ATS service is ready at $ATS_HOST2:$ATS_PORT2"
+echo "$(date) - service is ready at $L1_4_HOST:$L1_4_PORT"
+
+
+# L2 CACHES
+until nc -z $L2_1_HOST $L2_1_PORT; do
+  echo "$(date) - waiting for service at $L2_1_HOST:$L2_1_PORT..."
+  sleep 2
+done
+
+echo "$(date) - service is ready at $L2_1_HOST:$L2_1_PORT"
+
+until nc -z $L2_2_HOST $L2_2_PORT; do
+  echo "$(date) - waiting for service at $L2_2_HOST:$L2_2_PORT..."
+  sleep 2
+done
+
+echo "$(date) - service is ready at $L2_2_HOST:$L2_2_PORT"
+
+until nc -z $L2_3_HOST $L2_3_PORT; do
+  echo "$(date) - waiting for service at $L2_3_HOST:$L2_3_PORT..."
+  sleep 2
+done
+
+echo "$(date) - service is ready at $L2_3_HOST:$L2_3_PORT"
+
+until nc -z $L2_4_HOST $L2_4_PORT; do
+  echo "$(date) - waiting for service at $L2_4_HOST:$L2_4_PORT..."
+  sleep 2
+done
+
+echo "$(date) - service is ready at $L2_4_HOST:$L2_4_PORT"
 
 # Start the main application
 exec "$@"

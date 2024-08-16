@@ -12,6 +12,25 @@ import (
 	"github.com/rs/zerolog"
 )
 
+func getLogLevel(level string) zerolog.Level {
+	switch level {
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	case "fatal":
+		return zerolog.FatalLevel
+	case "panic":
+		return zerolog.PanicLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
 func main() {
 	var opts struct {
 		ServerAddr string `long:"server-addr" description:"specifying a server address for prometheus" default:":9090"`
@@ -21,6 +40,8 @@ func main() {
 		TraceFile  string `long:"trace-file" description:"specifying a file name of wiki trace records"`
 		LogLevel   string `long:"log-level" description:"specifying log level (info, debug, warn, error)" default:"info"`
 		CPUs       int    `long:"cpus" description:"specify the number of CPUs to be used" default:"1"`
+		Refs       int    `long:"io-refs" description:"specify the number of IO-Refs to run" default:"-1"`
+		IOps       int64  `long:"iops" description:"specify the number of IO per second" default:"1"`
 	}
 
 	_, err := flags.Parse(&opts)
@@ -37,19 +58,13 @@ func main() {
 		runtime.GOMAXPROCS(opts.CPUs)
 	}
 
-	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
-		With().Timestamp().Logger()
+	logLevel := getLogLevel(opts.LogLevel)
 
-	switch opts.LogLevel {
-	case "debug":
-		logger = logger.Level(zerolog.DebugLevel)
-	case "error":
-		logger = logger.Level(zerolog.ErrorLevel)
-	case "warn":
-		logger = logger.Level(zerolog.WarnLevel)
-	default:
-		logger = logger.Level(zerolog.InfoLevel)
-	}
+	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
+		Level(logLevel).
+		With().
+		Timestamp().
+		Logger()
 
 	L1Addrs := strings.Split(opts.L1Addrs, ",")
 	L2Addrs := strings.Split(opts.L2Addrs, ",")
@@ -65,6 +80,9 @@ func main() {
 		WikiFile: opts.TraceFile,
 		CPUs:     opts.CPUs,
 		Logger:   &logger,
+		LogLevel: logLevel,
+		IOrefs:   opts.Refs,
+		IOps:     opts.IOps,
 	}
 
 	if err := s.Serve(); err != nil {

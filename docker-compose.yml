@@ -9,23 +9,30 @@ services:
     container_name: CLIENT
     command:
       - "--server-addr=:9090" # server address for prometheus
-      - "--l1-addrs=frontend1:80,frontend2:80" # server address for varnish
-      - "--l2-addrs=frontend1:80,frontend2:80" # server address for varnish
+      - "--l1-addrs=frontend1:80,frontend2:80,frontend3:80,frontend4:80" # server address for varnish
+      - "--l2-addrs=edge-backend-1:80,edge-backend-2:80,edge-backend-3:80,edge-backend-4:80" # server address for varnish
       - "--l1-lb=rand"
-      - "--trace-file=/data/wiki_test.csv"
-      - "--log-level=debug"
+      - "--trace-file=/data/cache-t-00_converted.csv"
+      - "--log-level=info"
       - "--cpus=1"
+      - "--io-refs=10000"
+      - "--iops=100"
     ports:
       - "9090:9090"
     volumes:
-      - ./cmd/client/wiki_test.csv:/data/wiki_test.csv
+      - /Users/omermajeed/cdn_caches/DeploymentManager/Deploy/deploy_examples/traces/cache-t-00_converted.csv:/data/cache-t-00_converted.csv
       - ./internal/client/wait-for-edges.sh:/wait-for-edges.sh
       - ./logs:/var/log
     depends_on:
       - origin
       - frontend1
       - frontend2
-      - edge-backend
+      - frontend3
+      - frontend4
+      - edge-backend-1
+      - edge-backend-2
+      - edge-backend-3
+      - edge-backend-4
     networks:
       - mynetwork
 
@@ -37,7 +44,7 @@ services:
     container_name: ORIGIN
     command:
       - "--server-port=8080"
-      - "--log-level=debug"
+      - "--log-level=info"
       - "--cpus=1"
     volumes:
       - ./logs:/var/log
@@ -48,11 +55,11 @@ services:
     image: varnish:latest
     container_name: L1_1
     volumes:
-      - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
+      - ./scene/cache-node/frontend/toATS1.vcl:/etc/varnish/toATS.vcl
       - varnish_storage1:/var/lib/varnish:rw
       - ./logs:/var/log/varnish
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,10m
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,157284k
     ports:
       - "10080:80"
     depends_on:
@@ -75,10 +82,10 @@ services:
     image: varnish:latest
     container_name: L1_2
     volumes:
-      - ./scene/cache-node/frontend/toATS.vcl:/etc/varnish/toATS.vcl
+      - ./scene/cache-node/frontend/toATS2.vcl:/etc/varnish/toATS.vcl
       - varnish_storage2:/var/lib/varnish:rw
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage2.bin,10m
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage2.bin,157284k
     ports:
       - "10081:80"
     depends_on:
@@ -86,43 +93,136 @@ services:
     networks:
       - mynetwork
   
-  edge-backend:
-    build:
-      context: .
-      dockerfile: scene/trafficserver/Dockerfile
+  frontend3:
+    image: varnish:latest
+    container_name: L1_3
+    volumes:
+      - ./scene/cache-node/frontend/toATS3.vcl:/etc/varnish/toATS.vcl
+      - varnish_storage3:/var/lib/varnish:rw
+      - ./logs:/var/log/varnish
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage3.bin,157284k
+    ports:
+      - "10082:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  frontend4:
+    image: varnish:latest
+    container_name: L1_4
+    volumes:
+      - ./scene/cache-node/frontend/toATS4.vcl:/etc/varnish/toATS.vcl
+      - varnish_storage4:/var/lib/varnish:rw
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage4.bin,157284k
+    ports:
+      - "10083:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  # edge-backend:
+  #   build:
+  #     context: .
+  #     dockerfile: scene/trafficserver/Dockerfile
+  #   container_name: L2_1
+  #   volumes:
+  #     - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
+  #     - ./scene/cache-node/backend/remap.config:/etc/trafficserver/remap.config
+  #     - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
+  #     - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
+  #     - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
+  #     - ./logs/be_1:/var/log/trafficserver
+  #   ports:
+  #     - "20080:8080"
+  #   depends_on:
+  #     - origin
+  #   networks:
+  #     - mynetwork
+  
+  edge-backend-1:
+    image: varnish:latest
     container_name: L2_1
     volumes:
-      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
-      - ./scene/cache-node/backend/remap.config:/etc/trafficserver/remap.config
-      - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
-      - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
-      - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
-      - ./logs/be_1:/var/log/trafficserver
+      - ./scene/cache-node/backend/toATS1.vcl:/etc/varnish/toATS.vcl
+      - varnish_be_storage1:/var/lib/varnish:rw
+      - ./logs:/var/log/varnish
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage1.bin,629144k
     ports:
-      - "20080:8080"
+      - "20080:80"
     depends_on:
       - origin
     networks:
       - mynetwork
   
   edge-backend-2:
-    build:
-      context: .
-      dockerfile: scene/trafficserver/Dockerfile
+    image: varnish:latest
     container_name: L2_2
     volumes:
-      - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
-      - ./scene/cache-node/backend/remap_2.config:/etc/trafficserver/remap.config
-      - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
-      - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
-      - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
-      - ./logs/be_2:/var/log/trafficserver
+      - ./scene/cache-node/backend/toATS2.vcl:/etc/varnish/toATS.vcl
+      - varnish_be_storage2:/var/lib/varnish:rw
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage2.bin,629144k
     ports:
-      - "20081:8080"
+      - "20081:80"
     depends_on:
       - origin
     networks:
       - mynetwork
+  
+  edge-backend-3:
+    image: varnish:latest
+    container_name: L2_3
+    volumes:
+      - ./scene/cache-node/backend/toATS3.vcl:/etc/varnish/toATS.vcl
+      - varnish_be_storage3:/var/lib/varnish:rw
+      - ./logs:/var/log/varnish
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage3.bin,629144k
+    ports:
+      - "20082:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  edge-backend-4:
+    image: varnish:latest
+    container_name: L2_4
+    volumes:
+      - ./scene/cache-node/backend/toATS4.vcl:/etc/varnish/toATS.vcl
+      - varnish_be_storage4:/var/lib/varnish:rw
+    command: >
+      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage4.bin,629144k
+    ports:
+      - "20083:80"
+    depends_on:
+      - origin
+    networks:
+      - mynetwork
+  
+  # edge-backend-2:
+  #   build:
+  #     context: .
+  #     dockerfile: scene/trafficserver/Dockerfile
+  #   container_name: L2_2
+  #   volumes:
+  #     - ./scene/cache-node/backend/records.config:/etc/trafficserver/records.config
+  #     - ./scene/cache-node/backend/remap_2.config:/etc/trafficserver/remap.config
+  #     - ./scene/cache-node/backend/storage.config:/etc/trafficserver/storage.config
+  #     - ./scene/cache-node/backend/plugin.config:/etc/trafficserver/plugin.config
+  #     - ./scene/cache-node/backend/magnition_header.lua:/etc/trafficserver/magnition_header.lua
+  #     - ./logs/be_2:/var/log/trafficserver
+  #   ports:
+  #     - "20081:8080"
+  #   depends_on:
+  #     - origin
+  #   networks:
+  #     - mynetwork
 
   prometheus:
     image: prom/prometheus
@@ -137,6 +237,12 @@ services:
 volumes:
   varnish_storage1:
   varnish_storage2:
+  varnish_storage3:
+  varnish_storage4:
+  varnish_be_storage1:
+  varnish_be_storage2:
+  varnish_be_storage3:
+  varnish_be_storage4:
 
 
 networks:
