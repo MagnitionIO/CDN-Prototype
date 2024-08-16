@@ -15,11 +15,6 @@ backend edge-backend-3 {
     .port = "80";
 }
 
-backend edge-backend-4 {
-    .host = "edge-backend-4";
-    .port = "80";
-}
-
 sub vcl_recv {
     if (req.http.X-Cache-L2-Server == "0") {
         set req.backend_hint = edge-backend-1;
@@ -27,8 +22,6 @@ sub vcl_recv {
         set req.backend_hint = edge-backend-2;
     } else if (req.http.X-Cache-L2-Server == "2") {
         set req.backend_hint = edge-backend-3;
-    } else if (req.http.X-Cache-L2-Server == "3") {
-        set req.backend_hint = edge-backend-4;
     } else {
         set req.backend_hint = edge-backend-1;
     }
@@ -41,8 +34,6 @@ sub vcl_backend_fetch {
         set bereq.http.Host = "edge-backend-2:80";
     } else if (bereq.http.X-Cache-L2-Server == "2") {
         set bereq.http.Host = "edge-backend-3:80";
-    } else if (bereq.http.X-Cache-L2-Server == "3") {
-        set bereq.http.Host = "edge-backend-4:80";
     } else {
         set bereq.http.Host = "edge-backend-1:80";
     }
