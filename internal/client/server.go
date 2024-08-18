@@ -216,7 +216,7 @@ func (s *Server) loadWikiTrace() {
 			continue
 		}
 
-		if time.Since(start_timer) >= time.Duration(10)*time.Second {
+		if time.Since(start_timer) >= time.Duration(900)*time.Second {
 			log.Info().
 				Int("#################### Stats Peek", cnt).
 				Msg(" Refs #########################")
@@ -322,6 +322,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 
 	if xcache_status != "HIT" && xcache_status != "MISS" {
 		log.Error().Str("status", xcache_status).Msg("Unkown status received")
+		return
 	}
 	s.metrics.requests.WithLabelValues(xcache_status).Inc()
 	s.metrics.latency.Observe(float64(latency.Milliseconds()))
@@ -350,17 +351,19 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	}
 	L1Stats.lock.Unlock()
 
-	L2Stats := s.L2Stats[nextL2Index]
-	L2Stats.lock.Lock()
-	L2Stats.References += 1
-	L2Stats.ByteRefs += uint64(size)
-	L2Stats.Latency += uint64(latency)
-	if xcache_status == "MISS" || strings.Contains(xcache_node, "L1") {
-		L2Stats.Misses += 1
-		L2Stats.ByteMisses += uint64(size)
-		L2Stats.MissLatency += uint64(latency)
+	if xcache_status == "MISS" || strings.Contains(xcache_node, "L2") {
+		L2Stats := s.L2Stats[nextL2Index]
+		L2Stats.lock.Lock()
+		L2Stats.References += 1
+		L2Stats.ByteRefs += uint64(size)
+		L2Stats.Latency += uint64(latency)
+		if xcache_status == "MISS" {
+			L2Stats.Misses += 1
+			L2Stats.ByteMisses += uint64(size)
+			L2Stats.MissLatency += uint64(latency)
+		}
+		L2Stats.lock.Unlock()
 	}
-	L2Stats.lock.Unlock()
 
 	log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Dur("latency", time.Duration(latency.Nanoseconds())).Msg("Received Response")
 }
