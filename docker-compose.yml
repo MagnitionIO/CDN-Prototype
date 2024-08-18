@@ -15,7 +15,7 @@ services:
       - "--trace-file=/data/cache-t-00_converted.csv"
       - "--log-level=info"
       - "--cpus=1"
-      - "--io-refs=10000"
+      - "--io-refs=-1"
       - "--iops=100"
     ports:
       - "9090:9090"
