@@ -350,17 +350,19 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	}
 	L1Stats.lock.Unlock()
 
-	L2Stats := s.L2Stats[nextL2Index]
-	L2Stats.lock.Lock()
-	L2Stats.References += 1
-	L2Stats.ByteRefs += uint64(size)
-	L2Stats.Latency += uint64(latency)
-	if xcache_status == "MISS" || strings.Contains(xcache_node, "L1") {
-		L2Stats.Misses += 1
-		L2Stats.ByteMisses += uint64(size)
-		L2Stats.MissLatency += uint64(latency)
+	if xcache_status == "MISS" || strings.Contains(xcache_node, "L2") {
+		L2Stats := s.L2Stats[nextL2Index]
+		L2Stats.lock.Lock()
+		L2Stats.References += 1
+		L2Stats.ByteRefs += uint64(size)
+		L2Stats.Latency += uint64(latency)
+		if xcache_status == "MISS" {
+			L2Stats.Misses += 1
+			L2Stats.ByteMisses += uint64(size)
+			L2Stats.MissLatency += uint64(latency)
+		}
+		L2Stats.lock.Unlock()
 	}
-	L2Stats.lock.Unlock()
 
 	log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Dur("latency", time.Duration(latency.Nanoseconds())).Msg("Received Response")
 }
