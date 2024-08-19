@@ -280,35 +280,33 @@ func (s *Server) parse(record []string) (seq int, id string, size int, err error
 }
 
 func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
-	var nextL1Index = 0
+	var nextIndex = 0
 	var hash32 = murmur3.Sum32([]byte(id))
-	nextL2Index := int(hash32 % uint32(len(s.L2Addrs)))
-	// var nextL2Index = 0
 
 	switch s.L1LB {
 	case Rand:
-		nextL1Index = rand.Intn(len(s.L1Addrs))
+		nextIndex = rand.Intn(len(s.L1Addrs))
 	case Hash:
-		nextL1Index = int(hash32 % uint32(len(s.L1Addrs)))
+		nextIndex = int(hash32 % uint32(len(s.L1Addrs)))
 	default:
 	}
 
-	addr := s.L1Addrs[nextL1Index]
+	addr := s.L1Addrs[nextIndex]
 
 	endpoint := "http://" + addr
 
 	headers := map[string]string{
 		"X-Cache-L1-Store":  "True",
 		"X-Cache-L2-Store":  "False",
-		"X-Cache-L2-Server": strconv.FormatUint(uint64(nextL2Index), 10),
+		"X-Cache-L2-Server": strconv.FormatUint(uint64(nextIndex), 10),
 	}
 
 	s.Logger.Debug().
 		Int("seq", seq).
 		Str("id", id).
 		Int("size", size).
-		Int("L1:", nextL1Index).
-		Int("L2:", nextL2Index).
+		Int("L1:", nextIndex).
+		Int("L2:", nextIndex).
 		Str("endpoint", endpoint).
 		Msg("Sending Request")
 
@@ -319,8 +317,8 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	log := s.Logger.With().Int("seq", seq).
 		Str("id", id).
 		Int("size", size).
-		Int("L1:", nextL1Index).
-		Int("L2:", nextL2Index).
+		Int("L1:", nextIndex).
+		Int("L2:", nextIndex).
 		Str("endpoint", endpoint).
 		Logger()
 
@@ -349,7 +347,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 			// xcache_l2_enforce := enf_resp.Header.Get("X-Cache-L2-Store")
 			// log.Debug().Str("xcache_l2_enforce", xcache_l2_enforce).Msg("L2 cache enforced")
 
-			touch_resp, touch_err := s.client.GetObject(ctx, id, size, "http://"+s.L2Addrs[nextL2Index], headers)
+			touch_resp, touch_err := s.client.GetObject(ctx, id, size, "http://"+s.L2Addrs[nextIndex], headers)
 			if touch_err != nil {
 				log.Err(touch_err).Msg("Fail to touch object")
 				return
@@ -386,7 +384,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	}
 	overallStats.lock.Unlock()
 
-	L1Stats := s.L1Stats[nextL1Index]
+	L1Stats := s.L1Stats[nextIndex]
 	L1Stats.lock.Lock()
 	L1Stats.References += 1
 	L1Stats.ByteRefs += uint64(size)
@@ -399,7 +397,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	L1Stats.lock.Unlock()
 
 	if xcache_status == "MISS" || strings.Contains(xcache_node, "L2") {
-		L2Stats := s.L2Stats[nextL2Index]
+		L2Stats := s.L2Stats[nextIndex]
 		L2Stats.lock.Lock()
 		L2Stats.References += 1
 		L2Stats.ByteRefs += uint64(size)
@@ -557,24 +555,3 @@ func safeRatio(numerator, denominator uint64) float64 {
 	}
 	return result
 }
-
-// var originIndex = 0
-// var originMutex = sync.Mutex{}
-
-// func (s *Server) getOriginAddr(id string) string {
-// 	// Load balancing: round-robin
-// 	var nextL1Index = 0
-// 	switch s.L1LB {
-// 	case Rand:
-// 		nextL1Index = rand.Int() % len(s.L1Addrs)
-// 	case Hash:
-// 		hash32 := murmur3.Sum32([]byte(id))
-// 		nextL1Index = hash32 % len(s.L1Addrs)
-// 	default:
-// 	}
-// 	//	originMutex.Lock()
-// 	addr := s.L1Addrs[nextL1Index]
-// 	//	originIndex++
-// 	//	originMutex.Unlock()
-// 	return addr
-// }
