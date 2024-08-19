@@ -4,8 +4,10 @@ import (
 	"cdn-prototype/internal/origin"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -16,8 +18,6 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/panjf2000/ants/v2"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/spaolacci/murmur3"
 	"golang.org/x/time/rate"
@@ -52,17 +52,18 @@ type CacheStats struct {
 }
 
 type Server struct {
-	Addr     string // for prometheus
-	L1Addrs  []string
-	L2Addrs  []string
-	L1LB     LB_TYPE
-	L2LB     LB_TYPE
-	Logger   *zerolog.Logger
-	WikiFile string
-	CPUs     int // 0 => serial execution; positive => multiple goroutinues
-	IOrefs   int
-	IOps     int64
-	LogLevel zerolog.Level
+	Addr       string // for prometheus
+	L1Addrs    []string
+	L2Addrs    []string
+	L1LB       LB_TYPE
+	L2LB       LB_TYPE
+	Logger     *zerolog.Logger
+	WikiFile   string
+	CPUs       int // 0 => serial execution; positive => multiple goroutinues
+	IOrefs     int
+	IOps       int64
+	MoveOnHits int
+	LogLevel   zerolog.Level
 
 	client      *origin.Client
 	metrics     *metrics
@@ -91,9 +92,9 @@ func (s *Server) Serve() error {
 		s.IOps = 1
 	}
 
-	s.metrics = newMetrics()
-	prometheus.MustRegister(s.metrics.requests)
-	prometheus.MustRegister(s.metrics.latency)
+	// s.metrics = newMetrics()
+	// prometheus.MustRegister(s.metrics.requests)
+	// prometheus.MustRegister(s.metrics.latency)
 	s.L1Stats = make(map[int]*CacheStats)
 	s.L2Stats = make(map[int]*CacheStats)
 
@@ -134,14 +135,24 @@ func (s *Server) Serve() error {
 
 	s.setHandlers()
 
+	transport := &http.Transport{
+		DisableKeepAlives:   true, // Disable keep-alives to avoid idle connections issues
+		MaxIdleConns:        0,
+		IdleConnTimeout:     30 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
 	s.client = &origin.Client{
 		// Endpoint: "http://" + s.getOriginAddr(),
 		Client: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:    s.CPUs,
-				MaxConnsPerHost: s.CPUs,
-			},
+			// Transport: &http.Transport{
+			// 	MaxIdleConns:    s.CPUs,
+			// 	MaxConnsPerHost: s.CPUs,
+			// },
+			Transport: transport,
+			Timeout:   30 * time.Second, // Set a reasonable timeout
 		},
+		Logger: s.Logger,
 	}
 
 	go s.loadWikiTrace()
@@ -154,11 +165,12 @@ func (s *Server) Serve() error {
 }
 
 func (s *Server) setHandlers() {
-	s.promHandler = promhttp.Handler()
-	s.ec.GET("/client/metrics", func(ctx echo.Context) error {
-		s.promHandler.ServeHTTP(ctx.Response(), ctx.Request())
-		return nil
-	})
+	s.ec.GET("/client/metrics", s.userStats)
+	// s.promHandler = promhttp.Handler()
+	// s.ec.GET("/client/metrics", func(ctx echo.Context) error {
+	// 	s.promHandler.ServeHTTP(ctx.Response(), ctx.Request())
+	// 	return nil
+	// })
 }
 
 func (s *Server) loadWikiTrace() {
@@ -271,6 +283,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	var nextL1Index = 0
 	var hash32 = murmur3.Sum32([]byte(id))
 	nextL2Index := int(hash32 % uint32(len(s.L2Addrs)))
+	// var nextL2Index = 0
 
 	switch s.L1LB {
 	case Rand:
@@ -286,7 +299,7 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 
 	headers := map[string]string{
 		"X-Cache-L1-Store":  "True",
-		"X-Cache-L2-Store":  "True",
+		"X-Cache-L2-Store":  "False",
 		"X-Cache-L2-Server": strconv.FormatUint(uint64(nextL2Index), 10),
 	}
 
@@ -320,11 +333,46 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	xcache_status := resp.Header.Get("X-Cache-Status")
 	xcache_node := resp.Header.Get("X-Cache-Node")
 
+	if xcache_status == "HIT" && strings.Contains(xcache_node, "L1") {
+		xcache_hits := resp.Header.Get("X-Cache-Hit-Count")
+		hitCount, _ := strconv.Atoi(xcache_hits)
+		log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Str("Hits: ", xcache_hits).Dur("latency", time.Duration(latency.Nanoseconds())).Msg("Hit on L1")
+		if hitCount >= s.MoveOnHits {
+			log.Debug().Str("status", xcache_status).Str("Node", xcache_node).Str("Hits: ", xcache_hits).Dur("latency", time.Duration(latency.Nanoseconds())).Msg("Hit on L1, Moving to L2")
+			enf_resp, enf_err := s.client.EnforceL2Object(ctx, id, size, "http://origin:8080", headers)
+			if enf_err != nil {
+				log.Err(enf_err).Msg("Fail to enforce object")
+				return
+			}
+			defer enf_resp.Body.Close()
+
+			// xcache_l2_enforce := enf_resp.Header.Get("X-Cache-L2-Store")
+			// log.Debug().Str("xcache_l2_enforce", xcache_l2_enforce).Msg("L2 cache enforced")
+
+			touch_resp, touch_err := s.client.GetObject(ctx, id, size, "http://"+s.L2Addrs[nextL2Index], headers)
+			if touch_err != nil {
+				log.Err(touch_err).Msg("Fail to touch object")
+				return
+			}
+			defer touch_resp.Body.Close()
+
+			// xcache_l2_store_header := enf_resp.Header.Get("X-Cache-L2-Store")
+			// log.Debug().Str("xcache_l2_enforced", xcache_l2_store_header).Msg("L2 cache header change")
+
+			del_resp, del_err := s.client.DeleteObject(ctx, id, size, endpoint, headers)
+			if del_err != nil {
+				log.Err(del_err).Msg("Fail to delete object")
+				return
+			}
+			defer del_resp.Body.Close()
+		}
+	}
+
 	if xcache_status != "HIT" && xcache_status != "MISS" {
 		log.Error().Str("status", xcache_status).Msg("Unkown status received")
 	}
-	s.metrics.requests.WithLabelValues(xcache_status).Inc()
-	s.metrics.latency.Observe(float64(latency.Milliseconds()))
+	// s.metrics.requests.WithLabelValues(xcache_status).Inc()
+	// s.metrics.latency.Observe(float64(latency.Milliseconds()))
 
 	overallStats := s.overallStats
 	overallStats.lock.Lock()
@@ -422,6 +470,92 @@ func (s *Server) showStats() {
 		stats.lock.Unlock()
 	}
 
+}
+
+func (s *Server) userStats(ctx echo.Context) error {
+	overall := s.overallStats
+
+	overall.lock.Lock()
+	overallStats := map[string]interface{}{
+		"Refs":           overall.References,
+		"ByteRefs":       overall.ByteRefs,
+		"Misses":         overall.Misses,
+		"ByteMisses":     overall.ByteMisses,
+		"Hits":           overall.References - overall.Misses,
+		"ByteHits":       overall.ByteRefs - overall.ByteMisses,
+		"MissRatio":      safeRatio(overall.Misses, overall.References),
+		"ByteMissRatio":  safeRatio(overall.ByteMisses, overall.ByteRefs),
+		"AvgLatency":     safeRatio(overall.Latency, overall.References),
+		"AvgMissLatency": safeRatio(overall.MissLatency, overall.Misses),
+		"AvgHitLatency":  safeRatio(overall.Latency-overall.MissLatency, overall.References-overall.Misses),
+	}
+	overall.lock.Unlock()
+
+	l1Stats := make([]map[string]interface{}, len(s.L1Stats))
+	for i, stats := range s.L1Stats {
+		stats.lock.Lock()
+		l1Stats[i] = map[string]interface{}{
+			"Refs":           stats.References,
+			"ByteRefs":       stats.ByteRefs,
+			"Misses":         stats.Misses,
+			"ByteMisses":     stats.ByteMisses,
+			"Hits":           stats.References - stats.Misses,
+			"ByteHits":       stats.ByteRefs - stats.ByteMisses,
+			"MissRatio":      safeRatio(stats.Misses, stats.References),
+			"ByteMissRatio":  safeRatio(stats.ByteMisses, stats.ByteRefs),
+			"AvgLatency":     safeRatio(stats.Latency, stats.References),
+			"AvgMissLatency": safeRatio(stats.MissLatency, stats.Misses),
+			"AvgHitLatency":  safeRatio(stats.Latency-stats.MissLatency, stats.References-stats.Misses),
+		}
+		stats.lock.Unlock()
+	}
+
+	l2Stats := make([]map[string]interface{}, len(s.L2Stats))
+	for i, stats := range s.L2Stats {
+		stats.lock.Lock()
+		l2Stats[i] = map[string]interface{}{
+			"Refs":           stats.References,
+			"ByteRefs":       stats.ByteRefs,
+			"Misses":         stats.Misses,
+			"ByteMisses":     stats.ByteMisses,
+			"Hits":           stats.References - stats.Misses,
+			"ByteHits":       stats.ByteRefs - stats.ByteMisses,
+			"MissRatio":      safeRatio(stats.Misses, stats.References),
+			"ByteMissRatio":  safeRatio(stats.ByteMisses, stats.ByteRefs),
+			"AvgLatency":     safeRatio(stats.Latency, stats.References),
+			"AvgMissLatency": safeRatio(stats.MissLatency, stats.Misses),
+			"AvgHitLatency":  safeRatio(stats.Latency-stats.MissLatency, stats.References-stats.Misses),
+		}
+		stats.lock.Unlock()
+	}
+
+	response := map[string]interface{}{
+		"OverallStats": overallStats,
+		"L1Stats":      l1Stats,
+		"L2Stats":      l2Stats,
+	}
+
+	jsonResponse, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		s.Logger.Err(err).Msg("Error marshaling JSON")
+	}
+
+	s.Logger.Debug().
+		Str("Response: ", string(jsonResponse)).
+		Msg("Stats Json")
+
+	return ctx.JSON(http.StatusOK, response)
+}
+
+func safeRatio(numerator, denominator uint64) float64 {
+	if denominator == 0 {
+		return 0.0
+	}
+	result := float64(numerator) / float64(denominator)
+	if math.IsNaN(result) || math.IsInf(result, 0) {
+		return 0.0
+	}
+	return result
 }
 
 // var originIndex = 0

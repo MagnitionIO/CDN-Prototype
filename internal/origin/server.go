@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -18,6 +19,8 @@ type Server struct {
 	Port     uint16
 	Logger   *zerolog.Logger
 	LogLevel zerolog.Level
+	lock     sync.Mutex
+	l2_map   map[string]int
 
 	ec *echo.Echo
 }
@@ -45,6 +48,7 @@ func (s *Server) Serve() error {
 
 	s.Logger = &log
 	s.setHandlers()
+	s.l2_map = make(map[string]int)
 
 	s.Logger.Info().
 		Str("addr", s.Addr).Uint16("port", s.Port).
@@ -56,6 +60,7 @@ func (s *Server) Serve() error {
 func (s *Server) setHandlers() {
 	s.ec.GET("/origin", s.sayHello)
 	s.ec.GET("/origin/objects/:id", s.getObject)
+	s.ec.GET("/origin/objects/enforce-l2/:id", s.enforceL2Object)
 }
 
 func (s *Server) sayHello(ctx echo.Context) error {
@@ -84,7 +89,49 @@ func (s *Server) getObject(ctx echo.Context) error {
 	ctx.Response().Header().Set("X-Cache-Status", "MISS")
 	ctx.Response().Header().Set("X-Cache-Node", "ORIGIN")
 	ctx.Response().Header().Set("X-Cache-L1-Store", l1_store_header)
-	ctx.Response().Header().Set("X-Cache-L2-Store", l2_store_header)
+	s.lock.Lock()
+	if _, found := s.l2_map[objId]; found {
+		ctx.Response().Header().Set("X-Cache-L2-Store", "True")
+		s.l2_map[objId]--
+		if s.l2_map[objId] == 0 {
+			delete(s.l2_map, objId)
+		}
+	} else {
+		ctx.Response().Header().Set("X-Cache-L2-Store", l2_store_header)
+	}
+	s.lock.Unlock()
 
 	return ctx.String(http.StatusOK, strings.Repeat("*", objSize))
+}
+
+func (s *Server) enforceL2Object(ctx echo.Context) error {
+	log := s.Logger.With().Str("path", ctx.Path()).Logger()
+
+	l1_store_header := ctx.Request().Header.Get("X-Cache-L1-Store")
+	l2_store_header := ctx.Request().Header.Get("X-Cache-L2-Store")
+
+	objSize := 0
+	objId := ctx.Param("id")
+	if size, err := strconv.Atoi(ctx.QueryParam("size")); err != nil {
+		log.Debug().Err(err).Msg("Invalid size of object")
+		return ctx.String(http.StatusBadRequest, "Usage: /origin/objects/enforce-l2/:id?size=<integer>")
+	} else {
+		objSize = size
+	}
+
+	log.Debug().Str("objId", objId).Int("objSize", objSize).Str("X-Cache-L1-Store", l1_store_header).Str("X-Cache-L2-Store", l2_store_header).Msg("Enforce L2 object Start")
+
+	ctx.Response().Header().Set("X-Cache-L2-Store", "True")
+
+	s.lock.Lock()
+	if _, found := s.l2_map[objId]; found {
+		s.l2_map[objId]++
+	} else {
+		s.l2_map[objId] = 1
+	}
+	s.lock.Unlock()
+
+	log.Debug().Str("objId", objId).Int("objSize", objSize).Str("X-Cache-L1-Store", l1_store_header).Str("X-Cache-L2-Store", l2_store_header).Msg("Enforce L2 object End")
+
+	return ctx.String(http.StatusOK, "Enforced L2 Object")
 }

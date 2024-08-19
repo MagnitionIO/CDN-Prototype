@@ -17,6 +17,7 @@ services:
       - "--cpus=1"
       - "--io-refs=-1"
       - "--iops=100"
+      - "--move-on-hits=1"
     ports:
       - "9090:9090"
     volumes:

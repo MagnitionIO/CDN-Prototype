@@ -42,6 +42,7 @@ func main() {
 		CPUs       int    `long:"cpus" description:"specify the number of CPUs to be used" default:"1"`
 		Refs       int    `long:"io-refs" description:"specify the number of IO-Refs to run" default:"-1"`
 		IOps       int64  `long:"iops" description:"specify the number of IO per second" default:"1"`
+		MoveOnHits int    `long:"move-on-hits" description:"specify count after which L1 cache entry would be moved to L2" default:"1"`
 	}
 
 	_, err := flags.Parse(&opts)
@@ -72,17 +73,18 @@ func main() {
 	var L2LB = client.StringToLB["hash"]
 
 	s := &client.Server{
-		Addr:     opts.ServerAddr,
-		L1Addrs:  L1Addrs,
-		L2Addrs:  L2Addrs,
-		L1LB:     L1LB,
-		L2LB:     L2LB,
-		WikiFile: opts.TraceFile,
-		CPUs:     opts.CPUs,
-		Logger:   &logger,
-		LogLevel: logLevel,
-		IOrefs:   opts.Refs,
-		IOps:     opts.IOps,
+		Addr:       opts.ServerAddr,
+		L1Addrs:    L1Addrs,
+		L2Addrs:    L2Addrs,
+		L1LB:       L1LB,
+		L2LB:       L2LB,
+		WikiFile:   opts.TraceFile,
+		CPUs:       opts.CPUs,
+		Logger:     &logger,
+		LogLevel:   logLevel,
+		IOrefs:     opts.Refs,
+		IOps:       opts.IOps,
+		MoveOnHits: opts.MoveOnHits,
 	}
 
 	if err := s.Serve(); err != nil {

@@ -20,7 +20,17 @@ backend edge-backend-4 {
     .port = "80";
 }
 
+acl purge {
+    "172.18.0.0/24";
+}
+
 sub vcl_recv {
+    if (req.method == "PURGE") {
+        if (client.ip ~ purge) {
+            return (purge);
+        }
+    }
+
     if (req.http.X-Cache-L2-Server == "0") {
         set req.backend_hint = edge-backend-1;
     } else if (req.http.X-Cache-L2-Server == "1") {
@@ -62,5 +72,6 @@ sub vcl_deliver {
     if (obj.hits > 0) {
         set resp.http.X-Cache-Status = "HIT";
         set resp.http.X-Cache-Node = "L1-4";
+        set resp.http.X-Cache-Hit-Count = obj.hits;
     }
 }
