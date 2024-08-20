@@ -11,7 +11,7 @@ services:
       - "--server-addr=:9090" # server address for prometheus
       - "--l1-addrs=frontend1:80,frontend2:80,frontend3:80,frontend4:80" # server address for varnish
       - "--l2-addrs=edge-backend-1:80,edge-backend-2:80,edge-backend-3:80,edge-backend-4:80" # server address for varnish
-      - "--l1-lb=rand"
+      - "--l1-lb=hash"
       - "--trace-file=/data/cache-t-00_converted.csv"
       - "--log-level=info"
       - "--cpus=1"
@@ -225,15 +225,15 @@ services:
   #   networks:
   #     - mynetwork
 
-  prometheus:
-    image: prom/prometheus
-    container_name: STATS
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9091:9090"
-    networks:
-      - mynetwork
+  # prometheus:
+  #   image: prom/prometheus
+  #   container_name: STATS
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9091:9090"
+  #   networks:
+  #     - mynetwork
 
 volumes:
   varnish_storage1:
