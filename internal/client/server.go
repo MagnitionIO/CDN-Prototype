@@ -194,6 +194,7 @@ func (s *Server) loadWikiTrace() {
 
 	var wg sync.WaitGroup
 	cnt := 0
+	uniqueness_map := make(map[string]int)
 	for {
 
 		if (s.IOrefs > 0) && (cnt >= s.IOrefs) {
@@ -214,6 +215,12 @@ func (s *Server) loadWikiTrace() {
 		if err != nil {
 			log.Warn().Err(err).Strs("record", record).Msg("Skip invalid record")
 			continue
+		}
+
+		if existing_size, found := uniqueness_map[id]; found {
+			size = existing_size
+		} else {
+			uniqueness_map[id] = size
 		}
 
 		if time.Since(start_timer) >= time.Duration(900)*time.Second {
@@ -269,7 +276,13 @@ func (s *Server) parse(record []string) (seq int, id string, size int, err error
 
 func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	var nextL1Index = 0
-	var hash32 = murmur3.Sum32([]byte(id))
+
+	seed := uint32(21354)
+	hash := murmur3.New32WithSeed(seed)
+	hash.Write([]byte(id))
+	hash32 := hash.Sum32()
+
+	// var hash32 = murmur3.Sum32([]byte(id))
 	nextL2Index := int(hash32 % uint32(len(s.L2Addrs)))
 
 	switch s.L1LB {
