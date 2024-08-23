@@ -269,7 +269,13 @@ func (s *Server) parse(record []string) (seq int, id string, size int, err error
 
 func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	var nextL1Index = 0
-	var hash32 = murmur3.Sum32([]byte(id))
+
+	seed := uint32(21354)
+	hash := murmur3.New32WithSeed(seed)
+	hash.Write([]byte(id))
+	hash32 := hash.Sum32()
+
+	// var hash32 = murmur3.Sum32([]byte(id))
 	nextL2Index := int(hash32 % uint32(len(s.L2Addrs)))
 
 	switch s.L1LB {
@@ -324,8 +330,8 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 		log.Error().Str("status", xcache_status).Msg("Unkown status received")
 		return
 	}
-	s.metrics.requests.WithLabelValues(xcache_status).Inc()
-	s.metrics.latency.Observe(float64(latency.Milliseconds()))
+	// s.metrics.requests.WithLabelValues(xcache_status).Inc()
+	// s.metrics.latency.Observe(float64(latency.Milliseconds()))
 
 	overallStats := s.overallStats
 	overallStats.lock.Lock()
