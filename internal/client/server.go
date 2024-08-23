@@ -194,7 +194,7 @@ func (s *Server) loadWikiTrace() {
 
 	var wg sync.WaitGroup
 	cnt := 0
-	uniqueness_map := make(map[string]int)
+	// uniqueness_map := make(map[string]int)
 	for {
 
 		if (s.IOrefs > 0) && (cnt >= s.IOrefs) {
@@ -217,11 +217,11 @@ func (s *Server) loadWikiTrace() {
 			continue
 		}
 
-		if existing_size, found := uniqueness_map[id]; found {
-			size = existing_size
-		} else {
-			uniqueness_map[id] = size
-		}
+		// if existing_size, found := uniqueness_map[id]; found {
+		// 	size = existing_size
+		// } else {
+		// 	uniqueness_map[id] = size
+		// }
 
 		if time.Since(start_timer) >= time.Duration(900)*time.Second {
 			log.Info().
@@ -336,8 +336,8 @@ func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	if xcache_status != "HIT" && xcache_status != "MISS" {
 		log.Error().Str("status", xcache_status).Msg("Unkown status received")
 	}
-	s.metrics.requests.WithLabelValues(xcache_status).Inc()
-	s.metrics.latency.Observe(float64(latency.Milliseconds()))
+	// s.metrics.requests.WithLabelValues(xcache_status).Inc()
+	// s.metrics.latency.Observe(float64(latency.Milliseconds()))
 
 	overallStats := s.overallStats
 	overallStats.lock.Lock()

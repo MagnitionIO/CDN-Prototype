@@ -20,7 +20,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - /Users/omermajeed/cdn_caches/DeploymentManager/Deploy/deploy_examples/traces/cache-t-00_converted.csv:/data/cache-t-00_converted.csv
+      - /Users/omermajeed/cdn_caches/DeploymentManager/Deploy/deploy_examples/traces/cache-t-00_unique_size.csv:/data/cache-t-00_converted.csv
       - ./internal/client/wait-for-edges.sh:/wait-for-edges.sh
       - ./logs:/var/log
     depends_on:
