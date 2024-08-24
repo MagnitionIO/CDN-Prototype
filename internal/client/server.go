@@ -281,7 +281,13 @@ func (s *Server) parse(record []string) (seq int, id string, size int, err error
 
 func (s *Server) getObject(ctx context.Context, seq int, id string, size int) {
 	var nextIndex = 0
-	var hash32 = murmur3.Sum32([]byte(id))
+
+	seed := uint32(21354)
+	hash := murmur3.New32WithSeed(seed)
+	hash.Write([]byte(id))
+	hash32 := hash.Sum32()
+
+	// var hash32 = murmur3.Sum32([]byte(id))
 
 	switch s.L1LB {
 	case Rand:
