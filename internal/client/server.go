@@ -169,7 +169,7 @@ func (s *Server) loadWikiTrace() {
 	log := s.Logger.With().Str("wiki", s.WikiFile).Logger()
 
 	// Initialize rate limiter
-	limiter := rate.NewLimiter(rate.Every(time.Second/time.Duration(s.IOps)), 1) // 1 requests per second
+	limiter := rate.NewLimiter(rate.Every(time.Second/time.Duration(s.IOps)), 1)
 
 	if len(s.WikiFile) == 0 {
 		log.Info().Msg("Skip loading wiki trace: empty file name")
@@ -233,6 +233,17 @@ func (s *Server) loadWikiTrace() {
 			// Reset the timer
 			start_timer = time.Now()
 		}
+
+		// if cnt%10000 == 0 {
+		// 	log.Info().
+		// 		Int("#################### Stats Peek", cnt).
+		// 		Msg(" Refs #########################")
+		// 	s.showStats()
+		// 	log.Info().
+		// 		Msg("######################################")
+		// 	// // Reset the timer
+		// 	// start_timer = time.Now()
+		// }
 
 		// Wait for rate limiter
 		limiter.Wait(ctx)

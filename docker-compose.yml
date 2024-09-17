@@ -64,6 +64,10 @@ services:
       - "10080:80"
     depends_on:
       - origin
+      - edge-backend-1
+      - edge-backend-2
+      - edge-backend-3
+      - edge-backend-4
     networks:
       - mynetwork
 
@@ -90,6 +94,10 @@ services:
       - "10081:80"
     depends_on:
       - origin
+      - edge-backend-1
+      - edge-backend-2
+      - edge-backend-3
+      - edge-backend-4
     networks:
       - mynetwork
   
@@ -106,6 +114,10 @@ services:
       - "10082:80"
     depends_on:
       - origin
+      - edge-backend-1
+      - edge-backend-2
+      - edge-backend-3
+      - edge-backend-4
     networks:
       - mynetwork
   
@@ -121,6 +133,10 @@ services:
       - "10083:80"
     depends_on:
       - origin
+      - edge-backend-1
+      - edge-backend-2
+      - edge-backend-3
+      - edge-backend-4
     networks:
       - mynetwork
   

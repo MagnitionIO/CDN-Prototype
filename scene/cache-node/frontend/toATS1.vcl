@@ -46,11 +46,10 @@ sub vcl_backend_fetch {
     } else {
         set bereq.http.Host = "edge-backend-1:80";
     }
-#    set bereq.http.Host = "edge-backend:8080";
 }
 
 sub vcl_backend_response {
-    if (beresp.http.X-Cache-L1-Store == "False") {
+    if (beresp.http.X-Cache-L1-Store == "False" || beresp.http.X-Cache-Status == "HIT") {
         set beresp.ttl = 0s;
     } else {
         set beresp.ttl = 365d;
