@@ -11,7 +11,7 @@ services:
       - "--server-addr=:9090" # server address for prometheus
       - "--l1-addrs=frontend1:80,frontend2:80,frontend3:80,frontend4:80" # server address for varnish
       - "--l2-addrs=edge-backend-1:80,edge-backend-2:80,edge-backend-3:80,edge-backend-4:80" # server address for varnish
-      - "--l1-lb=rand"
+      - "--l1-lb=hash"
       - "--trace-file=/data/cache-t-00_converted.csv"
       - "--log-level=info"
       - "--cpus=1"
@@ -52,14 +52,14 @@ services:
       - mynetwork
   
   frontend1:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L1_1
     volumes:
       - ./scene/cache-node/frontend/toATS1.vcl:/etc/varnish/toATS.vcl
       - varnish_storage1:/var/lib/varnish:rw
       - ./logs:/var/log/varnish
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,157284k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage1.bin,157284k
     ports:
       - "10080:80"
     depends_on:
@@ -83,13 +83,13 @@ services:
   #     - mynetwork
   
   frontend2:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L1_2
     volumes:
       - ./scene/cache-node/frontend/toATS2.vcl:/etc/varnish/toATS.vcl
       - varnish_storage2:/var/lib/varnish:rw
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage2.bin,157284k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage2.bin,157284k
     ports:
       - "10081:80"
     depends_on:
@@ -102,14 +102,14 @@ services:
       - mynetwork
   
   frontend3:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L1_3
     volumes:
       - ./scene/cache-node/frontend/toATS3.vcl:/etc/varnish/toATS.vcl
       - varnish_storage3:/var/lib/varnish:rw
       - ./logs:/var/log/varnish
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage3.bin,157284k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage3.bin,157284k
     ports:
       - "10082:80"
     depends_on:
@@ -122,13 +122,13 @@ services:
       - mynetwork
   
   frontend4:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L1_4
     volumes:
       - ./scene/cache-node/frontend/toATS4.vcl:/etc/varnish/toATS.vcl
       - varnish_storage4:/var/lib/varnish:rw
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage4.bin,157284k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_storage4.bin,157284k
     ports:
       - "10083:80"
     depends_on:
@@ -160,14 +160,14 @@ services:
   #     - mynetwork
   
   edge-backend-1:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L2_1
     volumes:
       - ./scene/cache-node/backend/toATS1.vcl:/etc/varnish/toATS.vcl
       - varnish_be_storage1:/var/lib/varnish:rw
       - ./logs:/var/log/varnish
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage1.bin,629144k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage1.bin,629144k
     ports:
       - "20080:80"
     depends_on:
@@ -176,13 +176,13 @@ services:
       - mynetwork
   
   edge-backend-2:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L2_2
     volumes:
       - ./scene/cache-node/backend/toATS2.vcl:/etc/varnish/toATS.vcl
       - varnish_be_storage2:/var/lib/varnish:rw
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage2.bin,629144k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage2.bin,629144k
     ports:
       - "20081:80"
     depends_on:
@@ -191,14 +191,14 @@ services:
       - mynetwork
   
   edge-backend-3:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L2_3
     volumes:
       - ./scene/cache-node/backend/toATS3.vcl:/etc/varnish/toATS.vcl
       - varnish_be_storage3:/var/lib/varnish:rw
       - ./logs:/var/log/varnish
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage3.bin,629144k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage3.bin,629144k
     ports:
       - "20082:80"
     depends_on:
@@ -207,13 +207,13 @@ services:
       - mynetwork
   
   edge-backend-4:
-    image: varnish:latest
+    image: my-varnish:latest
     container_name: L2_4
     volumes:
       - ./scene/cache-node/backend/toATS4.vcl:/etc/varnish/toATS.vcl
       - varnish_be_storage4:/var/lib/varnish:rw
     command: >
-      -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage4.bin,629144k
+      varnishd -F -f /etc/varnish/toATS.vcl -s file,/var/lib/varnish/varnish_be_storage4.bin,629144k
     ports:
       - "20083:80"
     depends_on:
