@@ -216,7 +216,7 @@ func (s *Server) loadWikiTrace() {
 			continue
 		}
 
-		if time.Since(start_timer) >= time.Duration(900)*time.Second {
+		if time.Since(start_timer) >= time.Duration(300)*time.Second {
 			log.Info().
 				Int("#################### Stats Peek", cnt).
 				Msg(" Refs #########################")
