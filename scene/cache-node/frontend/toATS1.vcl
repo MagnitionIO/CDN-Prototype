@@ -60,7 +60,7 @@ sub vcl_backend_fetch {
 }
 
 sub vcl_backend_response {
-    if (beresp.http.X-Cache-L1-Store == "False") {
+    if (beresp.http.X-Cache-L1-Store == "False" || beresp.http.X-Cache-Status == "HIT") {
         set beresp.ttl = 0s;
     } else {
         set beresp.ttl = 365d;
